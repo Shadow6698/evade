@@ -1,0 +1,111 @@
+-- Serviços
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+local LocalPlayer = Players.LocalPlayer
+
+-- Variáveis
+local protectionEnabled = false
+local targetPosition = Vector3.new(-1044, 3335, 2364)
+local basePart = nil
+local protectionConnection = nil
+local originalCFrame = nil
+local gui = nil
+local toggleButton = nil
+
+-- Criar base fixa
+local function createBase()
+	if not basePart then
+		basePart = Instance.new("Part")
+		basePart.Size = Vector3.new(10, 1, 10)
+		basePart.Anchored = true
+		basePart.Position = targetPosition
+		basePart.Name = "ProtectedBase"
+		basePart.Color = Color3.fromRGB(100, 100, 100)
+		basePart.Parent = workspace
+	end
+end
+
+-- Ativar proteção
+local function enableProtection()
+	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local hrp = character:WaitForChild("HumanoidRootPart")
+
+	originalCFrame = hrp.CFrame
+
+	createBase()
+	protectionEnabled = true
+
+	protectionConnection = RunService.Heartbeat:Connect(function()
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local root = char:FindFirstChild("HumanoidRootPart")
+		local hum = char:FindFirstChildOfClass("Humanoid")
+
+		if root and hum then
+			if (root.Position - targetPosition).Magnitude > 2 then
+				root.CFrame = CFrame.new(targetPosition + Vector3.new(0, 3, 0))
+				hum.Sit = true
+			end
+		end
+	end)
+end
+
+-- Desativar proteção
+local function disableProtection()
+	protectionEnabled = false
+	if protectionConnection then
+		protectionConnection:Disconnect()
+		protectionConnection = nil
+	end
+	if basePart then
+		basePart:Destroy()
+		basePart = nil
+	end
+
+	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if hrp and originalCFrame then
+		hrp.CFrame = originalCFrame
+	end
+end
+
+-- Criar GUI (e recriar ao reset)
+local function createGUI()
+	if gui then gui:Destroy() end
+
+	gui = Instance.new("ScreenGui")
+	gui.Name = "BaseProtectionGUI"
+	gui.ResetOnSpawn = false
+	gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+	toggleButton = Instance.new("TextButton", gui)
+	toggleButton.Size = UDim2.new(0, 100, 0, 40)
+	toggleButton.Position = UDim2.new(0, 20, 0, 100)
+	toggleButton.Text = protectionEnabled and "OFF" or "ON"
+	toggleButton.BackgroundColor3 = protectionEnabled and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
+	toggleButton.TextColor3 = Color3.new(1, 1, 1)
+	toggleButton.TextSize = 18
+	toggleButton.Active = true
+	toggleButton.Draggable = true
+
+	toggleButton.MouseButton1Click:Connect(function()
+		if protectionEnabled then
+			toggleButton.Text = "ON"
+			toggleButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+			disableProtection()
+		else
+			toggleButton.Text = "OFF"
+			toggleButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+			enableProtection()
+		end
+	end)
+end
+
+-- Iniciar GUI
+createGUI()
+
+-- Recriar GUI sempre que o personagem for recriado
+LocalPlayer.CharacterAdded:Connect(function()
+	wait(1)
+	createGUI()
+end)
